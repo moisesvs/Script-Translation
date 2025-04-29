@@ -1,0 +1,8 @@
+streamlit
+yt-dlp
+openai-whisper
+ffmpeg-python
+fpdf
+feedparser
+transformers
+torch
