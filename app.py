@@ -7,6 +7,7 @@ st.title("📂 Verificador de cookies.txt")
 # Subir cookies.txt
 cookies_file = st.file_uploader("📤 Sube tu archivo cookies.txt", type="txt")
 
+
 # Mostrar mensaje si no hay archivo
 if not cookies_file:
     st.info("Esperando que subas tu archivo cookies.txt...")
