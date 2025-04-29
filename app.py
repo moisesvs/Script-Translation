@@ -12,12 +12,11 @@ import smtplib
 from email.message import EmailMessage
 import tempfile
 
-# Configuración de correo
 EMAIL = "moisesvs@gmail.com"
 EMAIL_PASS = "odeogoweqnzhqsuf"
 
 st.set_page_config(page_title="YouTube a PDF", layout="centered")
-st.title("📺 Transcripción + Resumen + PDF desde canal YouTube")
+st.title("📺 Transcripción + PDF desde canal YouTube")
 
 # Subida de cookies
 cookies_file = st.file_uploader("📤 Sube tu archivo cookies.txt", type="txt")
@@ -26,25 +25,24 @@ if not cookies_file:
     st.info("Sube tu archivo `cookies.txt` para continuar.")
     st.stop()
 
-# Guardar cookies.txt temporal
+# Guardar cookies
 tmp_cookie = tempfile.NamedTemporaryFile(delete=False, suffix=".txt")
 tmp_cookie.write(cookies_file.read())
 tmp_cookie.close()
 tmp_cookie_path = tmp_cookie.name
 
-# Verificar contenido
 with open(tmp_cookie_path, "r") as f:
     contenido = f.read().splitlines()
     if any("SID" in linea for linea in contenido):
-        st.success("🧠 El archivo contiene la cookie SID (¡todo bien!).")
+        st.success("🧠 El archivo contiene la cookie SID.")
     else:
-        st.warning("⚠️ El archivo no contiene la cookie SID. Puede que no funcione.")
+        st.warning("⚠️ El archivo no contiene la cookie SID.")
 
-# Campo para ingresar ID de canal
-canal_id = st.text_input("📺 Ingresa el Channel ID de YouTube", placeholder="Ej: UC_x5XG1OV2P6uZZ5FSM9Ttw")
+# Ingresar canal ID
+canal_id = st.text_input("📺 Ingresa el Channel ID de YouTube")
 
 if canal_id and st.button("🎬 Procesar canal"):
-    with st.spinner("Procesando video..."):
+    with st.spinner("Procesando..."):
 
         def limpiar_texto(texto):
             return ''.join(c for c in texto if ord(c) < 256 and unicodedata.category(c)[0] != 'C')
@@ -72,19 +70,14 @@ if canal_id and st.button("🎬 Procesar canal"):
 
         def descargar_audio(video_url, output_path):
             ydl_opts = {
-                'format': 'bestaudio/best',
-                'outtmpl': output_path,
+                'format': 'bestaudio',
+                'outtmpl': output_path.replace('%(ext)s', 'webm'),
                 'cookiefile': tmp_cookie_path,
-                'quiet': True,
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
-                }],
+                'quiet': True
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([video_url])
-            return output_path.replace("%(ext)s", "mp3")
+            return output_path.replace('%(ext)s', 'webm')
 
         def convertir_a_wav(input_path, output_path):
             ffmpeg.input(input_path).output(output_path, ac=1, ar='16k').run(overwrite_output=True, quiet=True)
@@ -144,16 +137,13 @@ if canal_id and st.button("🎬 Procesar canal"):
                 smtp.login(EMAIL, EMAIL_PASS)
                 smtp.send_message(msg)
 
-        # Flujo principal
+        # Ejecutar flujo completo
         video_url, titulo = obtener_ultimo_video(canal_id)
         st.success(f"🎥 Video detectado: {titulo}")
 
-        mp3_path = os.path.join(tempfile.gettempdir(), "audio.mp3")
-        mp3_path = descargar_audio(video_url, mp3_path)
-
-        wav_path = os.path.join(tempfile.gettempdir(), "audio.wav")
-        convertir_a_wav(mp3_path, wav_path)
-
+        temp_dir = tempfile.gettempdir()
+        webm_path = descargar_audio(video_url, os.path.join(temp_dir, "audio.%(ext)s"))
+        wav_path = convertir_a_wav(webm_path, os.path.join(temp_dir, "audio.wav"))
         transcripcion = transcribir_audio(wav_path)
         resumen = resumir_transcripcion(transcripcion)
         pdf_path = crear_pdf(transcripcion, resumen, titulo)
@@ -163,4 +153,5 @@ if canal_id and st.button("🎬 Procesar canal"):
 
         with open(pdf_path, "rb") as f:
             st.download_button("📥 Descargar PDF", data=f, file_name=os.path.basename(pdf_path), mime="application/pdf")
-        st.success("✅ Todo listo. El PDF fue enviado por correo y está disponible para descarga.")
+
+        st.success("✅ PDF enviado por correo y disponible para descarga.")
